@@ -37,11 +37,13 @@ ames<- read.csv("C:/Users/sreej/Desktop/MSIS/IS 6489 Stats & Pred/Final Project/
 
 ```{r Summary Stats}
 
+#quick NA visualization
 ames %>% 
   vis_dat()
 
 summary(ames)
 
+#distribution of target variable
 ames %>% 
   ggplot(aes(x = log(SalePrice)))+
   geom_histogram()
@@ -125,7 +127,7 @@ catPlots_fn(ames$GarageCars)
 
 
 ```{r Categorical variable exploration}
-
+#categorical variable exploration
 
 catPlots_fn(ames$MSSubClass)
 catPlots_fn(ames$MSZoning)
@@ -183,6 +185,8 @@ catPlots_fn(ames$SaleCondition)
 
 ```{r Automatic variable selection}
 
+#automatic variable selection
+
 plot(regsubsets(log(SalePrice)~LotFrontage+LotArea+MasVnrArea+BsmtFinSF1+BsmtFinSF2+
                   BsmtUnfSF+TotalBsmtSF+X1stFlrSF+X2ndFlrSF+LowQualFinSF+GrLivArea+
                   BsmtFullBath+BsmtHalfBath+WoodDeckSF+OpenPorchSF+EnclosedPorch+
@@ -221,7 +225,7 @@ plot(regsubsets(log(SalePrice)~RoofStyle+RoofMatl+Exterior1st+Exterior2nd+MasVnr
 
 
 ```{r Select few variables}
-
+#Select a few variables based on regsubsets
 
 ames1 <- ames %>% 
   select(X1stFlrSF,BsmtHalfBath,WoodDeckSF,EnclosedPorch,BedroomAbvGr,KitchenAbvGr,Fireplaces,TotalBsmtSF,
@@ -236,6 +240,8 @@ ames1 <- ames %>%
 
 
 ```{r Split data}
+#Split data into train and test
+
 set.seed(123)
 rows <- sample(nrow(ames1), .8*nrow(ames1))
 ames1_train <-ames1[rows, ]
@@ -253,6 +259,8 @@ ames_test <-ames[-rows, ]
 #Define RMSE
 rmse <- function (actual, predicted){
   sqrt(mean((actual-predicted)^2))}
+
+#Create models using caret package
 
 lm_mod <- train(log(SalePrice) ~ ., 
                data = ames1_train,
