@@ -1,0 +1,338 @@
+---
+title: "Ames Housing Data"
+author: "Sreeja Nair"
+date: "July 30, 2018"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse) 
+library(missForest)
+library(leaps)
+library(ModelMetrics)
+library(caret)
+library(visdat)
+library(grid)
+library(gridExtra)
+library(base2grob)
+#library(skimr)
+#library(moments) 
+#library(MASS)
+
+```
+
+
+
+```{r Data Import}
+
+ames<- read.csv("C:/Users/sreej/Desktop/MSIS/IS 6489 Stats & Pred/Final Project/ames_cleaned.csv")
+
+```
+
+
+
+```{r Summary Stats}
+
+ames %>% 
+  vis_dat()
+
+summary(ames)
+
+ames %>% 
+  ggplot(aes(x = log(SalePrice)))+
+  geom_histogram()
+
+```
+
+
+
+```{r Functions for plots}
+
+#for continuous values
+numPlots_fn <- function(variable){
+  #histogram
+  p1 <- ames %>% 
+  ggplot(aes(x = variable))+
+  geom_histogram()
+  
+  #scatterplot
+  p2 <- ames %>% 
+  ggplot(aes(x = variable, y = log(SalePrice)))+
+  geom_point()
+  
+  grid.arrange(p1,p2,nrow=2)
+  }
+
+
+#for discrete/categorical values
+catPlots_fn <- function(variable){
+  #barplot
+  p1 <- ames %>% 
+  ggplot(aes(x = variable))+
+  geom_bar()
+  
+  #boxplot
+  p2 <- ames %>% 
+  ggplot(aes(x = as.factor(variable), y = log(SalePrice)))+
+  geom_boxplot()
+  
+  grid.arrange(p1,p2,nrow=2)
+  }
+
+```
+
+
+```{r Numeric variable exploration}
+
+#numeric variable exploration
+
+
+numPlots_fn(ames$LotFrontage)
+numPlots_fn(ames$LotArea)
+numPlots_fn(ames$MasVnrArea)
+numPlots_fn(ames$BsmtFinSF1)
+numPlots_fn(ames$BsmtFinSF2)
+numPlots_fn(ames$BsmtUnfSF)
+numPlots_fn(ames$TotalBsmtSF)
+numPlots_fn(ames$X1stFlrSF)
+numPlots_fn(ames$X2ndFlrSF)
+numPlots_fn(ames$LowQualFinSF)
+numPlots_fn(ames$GrLivArea)
+numPlots_fn(ames$BsmtFullBath)
+numPlots_fn(ames$BsmtHalfBath)
+numPlots_fn(ames$WoodDeckSF)
+numPlots_fn(ames$OpenPorchSF)
+numPlots_fn(ames$EnclosedPorch)
+numPlots_fn(ames$X3SsnPorch)
+numPlots_fn(ames$ScreenPorch)
+numPlots_fn(ames$PoolArea)
+numPlots_fn(ames$MiscVal)
+numPlots_fn(ames$GarageArea)
+
+catPlots_fn(ames$FullBath)
+catPlots_fn(ames$HalfBath)
+catPlots_fn(ames$BedroomAbvGr)
+catPlots_fn(ames$KitchenAbvGr)
+catPlots_fn(ames$TotRmsAbvGrd)
+catPlots_fn(ames$Fireplaces)
+catPlots_fn(ames$GarageCars)
+
+```
+
+
+```{r Categorical variable exploration}
+
+
+catPlots_fn(ames$MSSubClass)
+catPlots_fn(ames$MSZoning)
+catPlots_fn(ames$Street)
+catPlots_fn(ames$Alley)
+catPlots_fn(ames$LotShape)
+catPlots_fn(ames$LandContour)
+catPlots_fn(ames$Utilities)
+catPlots_fn(ames$LotConfig)
+catPlots_fn(ames$LandSlope)
+catPlots_fn(ames$Neighborhood)
+catPlots_fn(ames$Condition1)
+catPlots_fn(ames$Condition2)
+catPlots_fn(ames$BldgType)
+catPlots_fn(ames$HouseStyle)
+catPlots_fn(ames$OverallQual)
+catPlots_fn(ames$OverallCond)
+catPlots_fn(ames$YearBuilt)
+catPlots_fn(ames$YearRemodAdd)
+catPlots_fn(ames$RoofStyle)
+catPlots_fn(ames$RoofMatl)
+catPlots_fn(ames$Exterior1st)
+catPlots_fn(ames$Exterior2nd)
+catPlots_fn(ames$MasVnrType)
+catPlots_fn(ames$ExterQual)
+catPlots_fn(ames$ExterCond)
+catPlots_fn(ames$Foundation)
+catPlots_fn(ames$BsmtQual)
+catPlots_fn(ames$BsmtCond)
+catPlots_fn(ames$BsmtExposure)
+catPlots_fn(ames$BsmtFinType1)
+catPlots_fn(ames$BsmtFinType2)
+catPlots_fn(ames$Heating)
+catPlots_fn(ames$HeatingQC)
+catPlots_fn(ames$CentralAir)
+catPlots_fn(ames$Electrical)
+catPlots_fn(ames$KitchenQual)
+catPlots_fn(ames$FireplaceQu)
+catPlots_fn(ames$GarageType)
+catPlots_fn(ames$GarageYrBlt)
+catPlots_fn(ames$GarageFinish)
+catPlots_fn(ames$GarageQual)
+catPlots_fn(ames$GarageCond)
+catPlots_fn(ames$PavedDrive)
+catPlots_fn(ames$PoolQC)
+catPlots_fn(ames$Fence)
+catPlots_fn(ames$MiscFeature)
+catPlots_fn(ames$MoSold)
+catPlots_fn(ames$YrSold)
+catPlots_fn(ames$SaleType)
+catPlots_fn(ames$SaleCondition)
+
+```
+
+
+```{r Automatic variable selection}
+
+plot(regsubsets(log(SalePrice)~LotFrontage+LotArea+MasVnrArea+BsmtFinSF1+BsmtFinSF2+
+                  BsmtUnfSF+TotalBsmtSF+X1stFlrSF+X2ndFlrSF+LowQualFinSF+GrLivArea+
+                  BsmtFullBath+BsmtHalfBath+WoodDeckSF+OpenPorchSF+EnclosedPorch+
+                  X3SsnPorch+ScreenPorch+PoolArea+MiscVal+GarageArea+FullBath+HalfBath+
+                  BedroomAbvGr+KitchenAbvGr+TotRmsAbvGrd+Fireplaces+GarageCars, 
+                data=ames, method = "exhaustive", nbest = 1, really.big = T))
+
+plot(regsubsets(log(SalePrice)~MSSubClass+MSZoning+Street+Alley+LotShape+LandContour+
+                  Utilities+LotConfig, 
+                data=ames, method = "exhaustive", nbest = 1, really.big = T))
+
+plot(regsubsets(log(SalePrice)~LandSlope+Neighborhood+Condition1+Condition2,
+                data=ames, method = "exhaustive", nbest = 1, really.big = T))
+
+plot(regsubsets(log(SalePrice)~BldgType+HouseStyle+BsmtQual+BsmtCond+BsmtExposure+BsmtFinType1, 
+                data=ames, method = "exhaustive", nbest = 1, really.big = T))
+
+plot(regsubsets(log(SalePrice)~BsmtFinType2+Heating+HeatingQC+CentralAir+Electrical+KitchenQual+
+                  FireplaceQu, 
+                data=ames, method = "exhaustive", nbest = 1, really.big = T))
+
+plot(regsubsets(log(SalePrice)~GarageType+GarageYrBlt+GarageFinish+GarageQual+GarageCond+
+                  PavedDrive+PoolQC+Fence+MiscFeature, 
+                data=ames, method = "exhaustive", nbest = 1, really.big = T))
+
+plot(regsubsets(log(SalePrice)~MoSold+YrSold+SaleType+OverallQual+OverallCond+YearBuilt+YearRemodAdd+
+                  SaleCondition, 
+                data=ames, method = "exhaustive", nbest = 1, really.big = T))
+
+plot(regsubsets(log(SalePrice)~RoofStyle+RoofMatl+Exterior1st+Exterior2nd+MasVnrType+ExterQual+
+                  ExterCond+Foundation, 
+                data=ames, method = "exhaustive", nbest = 1, really.big = T))
+
+```
+
+
+
+```{r Select few variables}
+
+
+ames1 <- ames %>% 
+  select(X1stFlrSF,BsmtHalfBath,WoodDeckSF,EnclosedPorch,BedroomAbvGr,KitchenAbvGr,Fireplaces,TotalBsmtSF,
+         GrLivArea,MSZoning,Alley,LotShape,LandContour,Neighborhood,BldgType,HouseStyle,
+         BsmtQual, BsmtExposure,BsmtCond,BsmtFinType1,HeatingQC,CentralAir,Electrical,KitchenQual,
+         FireplaceQu,GarageType,GarageYrBlt,GarageQual,PavedDrive,PoolQC,SaleType,OverallQual,
+         YearBuilt,YearRemodAdd,RoofStyle,RoofMatl,Exterior1st,MasVnrType,ExterQual,Foundation, SalePrice)
+
+
+```
+
+
+
+```{r Split data}
+set.seed(123)
+rows <- sample(nrow(ames1), .8*nrow(ames1))
+ames1_train <-ames1[rows, ]
+ames1_test <-ames1[-rows, ]
+
+rows <- sample(nrow(ames), .8*nrow(ames))
+ames_train <-ames[rows, ]
+ames_test <-ames[-rows, ]
+
+
+```
+
+```{r Model}
+
+#Define RMSE
+rmse <- function (actual, predicted){
+  sqrt(mean((actual-predicted)^2))}
+
+lm_mod <- train(log(SalePrice) ~ ., 
+               data = ames1_train,
+               preProcess = c("center", "scale"),
+               method = "lm",
+               trControl = trainControl(method = "cv"))
+
+lm_mod
+
+#RMSE       Rsquared   MAE     
+#0.1995387  0.7790884  0.104947
+
+rmse(log(ames1_test$SalePrice), predict(lm_mod, newdata=ames1_test)) #0.1695709
+
+knn_mod <- train(log(SalePrice) ~ ., 
+               data = ames1_train,
+               preProcess = c("center", "scale"),
+               method = "knn",
+               trControl = trainControl(method = "cv"))
+
+
+knn_mod
+
+#  k  RMSE       Rsquared   MAE      
+#  5  0.2098418  0.7322021  0.1516949
+#  7  0.2018599  0.7528224  0.1451895
+#  9  0.2019104  0.7539704  0.1445886
+rmse(log(ames1_test$SalePrice), predict(knn_mod, newdata=ames1_test)) #0.2063802
+
+rf_mod <- train(log(SalePrice) ~ ., 
+               data = ames1_train,
+               preProcess = c("center", "scale"),
+               method = "rf",
+               trControl = trainControl(method = "cv"))
+
+
+rf_mod
+
+#mtry  RMSE       Rsquared   MAE      
+#    2   0.2289957  0.7760604  0.1622988
+#   86   0.1472754  0.8691355  0.1015700
+#  170   0.1536500  0.8558983  0.1059913
+
+rmse(log(ames1_test$SalePrice), predict(rf_mod, newdata=ames1_test)) #0.1540024
+
+glmnet_mod <- train(log(SalePrice) ~ ., 
+               data = ames_train,
+               preProcess = c("center", "scale"),
+               method = "glmnet",
+               tuneGrid= expand.grid(
+                 alpha=0:1,
+                 lambda = seq(0,0.5,0.001)))
+glmnet_mod
+
+plot(glmnet_mod)
+
+rmse(log(ames_test$SalePrice), predict(glmnet_mod, newdata=ames_test)) #0.1546817
+
+# #Preparing Test Set for model
+# 
+# test <- read.csv("C:/Users/sreej/Desktop/MSIS/IS 6489 Stats & Pred/Final Project/test_cleaned.csv")
+# test1 <- test %>% 
+#   select(X1stFlrSF,BsmtHalfBath,WoodDeckSF,EnclosedPorch,BedroomAbvGr,KitchenAbvGr,Fireplaces,TotalBsmtSF,
+#          GrLivArea,MSZoning,Alley,LotShape,LandContour,Neighborhood,BldgType,HouseStyle,
+#          BsmtQual, BsmtExposure,BsmtCond,BsmtFinType1,HeatingQC,CentralAir,Electrical,KitchenQual,
+#          FireplaceQu,GarageType,GarageYrBlt,GarageQual,PavedDrive,PoolQC,SaleType,OverallQual,
+#          YearBuilt,YearRemodAdd,RoofStyle,RoofMatl,Exterior1st,MasVnrType,ExterQual,Foundation)
+# 
+# #Predicting with model on test set
+# 
+# my_pred <- predict(rf_mod, newdata=test1, type="raw")
+# head(my_pred)
+# 
+# mypred <- exp(my_pred)
+# head(mypred)
+# 
+# #Creating and exporting solution for Kaggle. 
+# my_solution <- data.frame(Id=test$Id, SalePrice=mypred)
+# write.csv(my_solution, file = "snair_rf.csv", row.names = FALSE)
+
+
+```
+
